@@ -1,0 +1,172 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+# This R environment comes with all of CRAN preinstalled, as well as many other helpful packages
+# The environment is defined by the kaggle/rstats docker image: https://github.com/kaggle/docker-rstats
+# For example, here's several helpful packages to load in 
+
+library(ggplot2) # Data visualization
+library(readr) # CSV file I/O, e.g. the read_csv function
+library(tidyr)
+library(dplyr)
+library(treemap)
+# Input data files are available in the "../input/" directory.
+# For example, running this (by clicking run or pressing Shift+Enter) will list the files in the input directory
+
+# Any results you write to the current directory are saved as output.
+# na.strings=c("","-","NA") -> consider "","-","NA" as na
+all.raw <- read.csv("E:\\Personal Work\\datasets\\govt-of-india-census-2001-district-wise\\all.csv",stringsAsFactors = FALSE, header = TRUE, na.strings=c("","-","NA"))
+all.raw$ST.1.Population <- as.integer(all.raw$ST.1.Population,na.strings=c("","-","NA"))
+all.raw$ST.3.Population <- as.integer(all.raw$ST.3.Population,na.strings=c("","-","NA"))
+```
+
+```{r}
+state.districts <- all.raw %>% group_by(State)
+state.districts <- state.districts %>% summarize(population = sum(Persons, na.rm = TRUE)
+                                                 ,popDensity = sum(Persons)/n()
+                                                 ,literatePopulation = sum(Persons..literate, na.rm = TRUE)
+                                                 ,literateMale = sum(Males..Literate, na.rm = TRUE)
+                                                 ,literateFemale = sum(Females..Literate, na.rm = TRUE)
+                                                 ,literacyRate = sum(Persons..literacy.rate, na.rm = TRUE)
+                                                 ,literacyMale = sum(Males..Literatacy.Rate, na.rm = TRUE)
+                                                 ,literacyFemale = sum(Females..Literacy.Rate, na.rm = TRUE)
+                                                 ,SC.Population = sum(sum(SC.1.Population,SC.2.Population,SC.3.Population, na.rm = TRUE), na.rm = TRUE)
+                                                 ,ST.Population = sum(sum(ST.1.Population,ST.2.Population,ST.3.Population, na.rm = TRUE), na.rm = TRUE)
+                                                 ,Household.size = mean(Household.size..per.household., rm.na = TRUE)
+                                                 ,Below.Primary.Avg = sum(Below.Primary, na.rm=TRUE)
+                                                 ,Primary.Avg = sum(Primary, na.rm = TRUE)
+                                                 ,Middle.Avg = sum(Middle, na.rm = TRUE)
+                                                 ,Matric.Higher.Secondary.Diploma.Avg = sum(Matric.Higher.Secondary.Diploma, na.rm = TRUE)
+                                                 ,Graduate.and.Above.Avg = sum(Graduate.and.Above, ne.rm = TRUE)
+                                                 ,count = n())
+state.districts$SC.Percentage = state.districts$SC.Population/state.districts$population
+state.districts$ST.Percentage = state.districts$ST.Population/state.districts$population
+state.districts$Literate.Percentage = state.districts$literatePopulation/state.districts$population
+state.districts$Below.Primary.Avg = round(state.districts$Below.Primary.Avg/state.districts$population, 2)
+state.districts$Primary.Avg = round(state.districts$Primary.Avg/state.districts$population, 2)
+state.districts$Middle.Avg = round(state.districts$Middle.Avg/state.districts$population, 2)
+state.districts$Matric.Higher.Secondary.Diploma.Avg = round(state.districts$Matric.Higher.Secondary.Diploma.Avg/state.districts$population, 2)
+state.districts$Graduate.and.Above.Avg = round(state.districts$Graduate.and.Above.Avg/state.districts$population, 2)
+
+literacyPercentage <- state.districts$literatePopulation/state.districts$population
+```
+
+```{r}
+qplot(x=State, width=0.5, data=all.raw, geom="bar") +
+ylab("District Count") +
+theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 7), aspect.ratio = 0.9, axis.ticks = element_blank())
+
+ggplot(data=state.districts) +
+geom_bar(aes(x=State, y=popDensity), stat="identity", width=0.5) +
+ylab("Population / no. of districts") +
+ggtitle("Population density in terms of districts") +
+theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 7), aspect.ratio = 0.9, axis.ticks = element_blank())
+```
+
+```{r}
+treemap(state.districts, index = c('State'), vSize = "SC.Percentage", vColor="count",
+       type="index", palette="Blues",
+       title="SC population percentage per state", 
+       fontsize.title=14,
+       fontsize.labels=8,
+       fontface.labels=1,
+       aspRatio = 3/4,
+       border.lwds=1)
+
+treemap(state.districts, index = c('State'), vSize = "ST.Percentage", vColor="count",
+       type="index", palette="Blues",
+       title="ST population percentage per state", 
+       fontsize.title=14,
+       fontsize.labels=8,
+       fontface.labels=1,
+       aspRatio = 3/4,
+       border.lwds=1)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+```{r}
+#literatePopulation/population ratio analysis
+print("States with literatePopulation/population ratio less than the 25percentile")
+state.districts %>% filter((literatePopulation/population) < quantile(literacyPercentage, 0.25)) %>% select(State,Literate.Percentage) %>% ungroup() %>% arrange(Literate.Percentage)
+print("States with literatePopulation/population ratio greater than the 75percentile")
+state.districts %>% filter((literatePopulation/population) > quantile(literacyPercentage, 0.75)) %>% select(State,Literate.Percentage) %>% ungroup() %>% arrange(desc(Literate.Percentage))
+print("States with minimum literatePopulation/population ratio")
+state.districts %>% filter((literatePopulation/population) == min(literacyPercentage)) %>% select(State,Literate.Percentage)
+print("States with maximum literatePopulation/population")
+state.districts %>% filter((literatePopulation/population) == max(literacyPercentage)) %>% select(State,Literate.Percentage)
+
+ggplot(data=state.districts, aes(x=State, y=(literatePopulation/population))) +
+geom_bar(stat="identity", width=0.5) +
+ylim(c(0,1.1)) +
+  geom_hline(yintercept=mean(literacyPercentage), color="red", size = 0.1) +
+    geom_text(aes(5,mean(literacyPercentage),label = "Mean"), size = 3, vjust = -0.2) +
+  geom_hline(yintercept=quantile(literacyPercentage, 0.75), color="blue", size = 0.1) +
+    geom_text(aes(5,quantile(literacyPercentage, 0.75),label = "75 Percentile"), size = 3, vjust = -0.2) +
+  geom_hline(yintercept=quantile(literacyPercentage, 0.25), color="yellow", size = 0.1) +
+    geom_text(aes(5,quantile(literacyPercentage, 0.25),label = "25 Percentile"), size = 3, vjust = -0.2) +
+  ylab("Literate/Population") +
+  ggtitle("Percentage of literate population in each state") +
+theme(axis.text.x = element_text(angle = 60, hjust = 1), aspect.ratio=0.6, axis.ticks = element_blank()) +
+theme(legend.position="none") 
+
+qplot(y=literacyPercentage, x= 1, geom = "boxplot", xlab="India", 
+      ylab="Ratio of literate people to total population in each state",
+      main="Box plot of states based on percentage of literate population")
+```
+
+```{r}
+print("The correlation between the two :")
+cor.test(state.districts$Literate.Percentage, state.districts$Household.size, method="pearson")
+
+ggplot(data=state.districts, aes(y=Literate.Percentage, x=Household.size)) + 
+geom_point() +
+geom_smooth() +
+
+geom_hline(yintercept=mean(state.districts$Literate.Percentage), color="red", size = 0.1) +
+geom_text(aes(2.5,mean(state.districts$Literate.Percentage),label = "Mean literacy percentage"), size = 3, vjust = -0.2) +
+geom_hline(yintercept=quantile(state.districts$Literate.Percentage, 0.25), color="green", size = 0.1) +
+geom_text(aes(2.5,quantile(state.districts$Literate.Percentage, 0.25),label = "25 percentile literacy percentage"), size = 3, vjust = -0.2) +
+
+geom_vline(xintercept=mean(state.districts$Household.size, na.rm=TRUE), color="red", size = 0.1, linetype=2) +
+geom_text(aes(x=mean(state.districts$Household.size, na.rm=TRUE)-1,y=0.9,label = "Mean household size"), size = 3, hjust = 0.2) +
+geom_vline(xintercept=quantile(state.districts$Household.size, 0.75, na.rm=TRUE), color="black", size = 0.1, linetype=2) +
+geom_text(aes(x=quantile(state.districts$Household.size, 0.75, na.rm=TRUE)+0.2,y=0.8,label = "75 percentile household size"), size = 3, hjust = 0.2) +
+
+ylab("Percentage literate") +
+ylim(0, 1) +
+xlab("Household size") +
+xlim(1, 8) +
+ggtitle("Household size in each state") +
+#theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+theme(legend.position="none", axis.ticks = element_blank()) +
+theme(axis.text.x = element_text(angle = 45, hjust = 1), axis.ticks = element_blank())
+```
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+```{r}
+State.Education <- state.districts %>% gather(Below.Primary.Avg,Primary.Avg,Middle.Avg,Matric.Higher.Secondary.Diploma.Avg,Graduate.and.Above.Avg,key="Education.Level", value="Mean.Count")
+State.Education$Education.Level <- factor(State.Education$Education.Level,c('Below.Primary.Avg','Primary.Avg','Middle.Avg','Matric.Higher.Secondary.Diploma.Avg','Graduate.and.Above.Avg'))
+
+ggplot(State.Education, aes(Education.Level, State)) + 
+geom_tile(aes(fill = Mean.Count),colour = "white") + 
+scale_fill_gradient(low = "white",high = "red") +
+geom_text(aes(label=Mean.Count), size=2.5) +
+theme(axis.text.x = element_text(angle = 45, hjust = 1), axis.ticks = element_blank()) +
+scale_x_discrete(expand = c(0, 0)) +
+scale_y_discrete(expand = c(0, 0)) +
+ggtitle("Percentage of population at different levels of education")
+
+print("States with highest percentage of population having Primary education")
+state.districts[order(state.districts$Primary.Avg, decreasing=T)[1:10],] %>% select(State, Primary.Avg)
+print("States with lowest percentage of population having Primary education")
+state.districts[order(state.districts$Primary.Avg, decreasing=F)[1:5],] %>% select(State, Primary.Avg)
+print("States with highest percentage of population having Graduate and above level of education")
+state.districts[order(state.districts$Graduate.and.Above.Avg, decreasing=T)[1:5],] %>% select(State, Graduate.and.Above.Avg)
+```
