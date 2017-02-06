@@ -25,6 +25,7 @@ library(treemap)
 all.raw <- read.csv("E:\\Personal Work\\datasets\\govt-of-india-census-2001-district-wise\\all.csv",stringsAsFactors = FALSE, header = TRUE, na.strings=c("","-","NA"))
 all.raw$ST.1.Population <- as.integer(all.raw$ST.1.Population,na.strings=c("","-","NA"))
 all.raw$ST.3.Population <- as.integer(all.raw$ST.3.Population,na.strings=c("","-","NA"))
+glimpse(all.raw)
 ```
 
 ```{r}
